@@ -1,3 +1,9 @@
+"""
+# Python Client for testing purposes
+# Author: 2016 Diwas Timilsina 
+"""
+
+
 import threading
 import xmlrpclib
 import sys
@@ -23,7 +29,7 @@ def buy(server,id):
     print answer
 
 
-    
+
 def run_manually(name):
     server = xmlrpclib.Server(name)
     line = sys.stdin.readline()
@@ -86,7 +92,7 @@ def stress_test(name, thread_count, num_requests):
     print "Done with %d threads" % finished_count
 
 def run_client(name, count):
-    server = xmlrpclib.Server(name) 
+    server = xmlrpclib.Server(name)
     for _ in range(count):
         buy(server, 12498)
 
@@ -101,9 +107,6 @@ if __name__ == "__main__":
         for i in range(1, 5) + range(5, 51, 5):
             print 'with %d threads' % i
             stress_test(name, i, 500)
-            print            
+            print
     else:
         run_manually(name)
-
-
-

@@ -1,7 +1,11 @@
 /**
   *  XML RPC Client in java
   *
-  * (c) 2016 Diwas Timilsina
+  *  Clients can make the following calls:
+  *  1) lookup and buy books based on book unique id
+  *  2) search books based on category of books
+  *
+  *  Author: 2016 Diwas Timilsina
 **/
 
 import java.util.*;
@@ -13,16 +17,12 @@ import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
 
 public class Client {
 
-    // print statement made easier
-    public static void println(String print_text){
-      System.out.println(print_text);
-    }
-    // print statement made easier
-    public static void println(int print_int){
-      System.out.println(print_int);
-    }
+    /*
+     * Search call from the client
+     * @param client, client instance who is going to nake the RPC call
+     * @param topic, category of the books that the client wants to lookup
+    */
 
-    // search call
     public static void serverSearch(XmlRpcClient client, String topic){
       String [] params = {topic};
       try {
@@ -35,7 +35,12 @@ public class Client {
       }
     }
 
-    // lookup call
+    /*
+     * Lookup call from the client
+     * @param client, client instance who is going to nake the RPC call
+     * @param id, id of the book that the client wants to lookup
+    */
+
     public static void serverLookup(XmlRpcClient client, int id){
       Integer [] params = {id};
       try{
@@ -46,8 +51,13 @@ public class Client {
       }
     }
 
-    // buy call
-    public static void serverBuy(XmlRpcClient client,int id){
+    /*
+     *  Buy call from the client
+     *  @param client, client instance who is going to nake the RPC call
+     *  @param id, id of the book that is to be purchased
+    */
+
+    public static void serverBuy(XmlRpcClient client, int id){
       Integer [] params = {id};
       try {
         Object result = (Object) client.execute("sample.buy",params);
@@ -57,12 +67,30 @@ public class Client {
       }
     }
 
+    // print statement made easier
+    public static void println(String print_text){
+      System.out.println(print_text);
+    }
+
+    // print statement made easier
+    public static void println(int print_int){
+      System.out.println(print_int);
+    }
+
+
+    /**
+    *  Main function for client
+    */
+
     public static void main (String [] args) {
+
+        // Client needs to specify the server address and the port for connection
       	if (args.length < 2) {
       	    System.err.println("usage: java Client <server address> <port>");
       	    System.exit(1);
       	}
 
+        // configure client
         XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
         XmlRpcClient client=null;
 
@@ -71,17 +99,25 @@ public class Client {
             client = new XmlRpcClient();
             client.setConfig(config);
         } catch (Exception e) {
+            // in case client is not able to establish connection with the server
             println("Client error: "+ e);
             java.lang.System.exit(1);
         }
 
+
         Scanner s;
         String func;
         try{
+
+            // read input from the client standard input
 		        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		        String input;
 
 		        while((input=br.readLine())!=null){
+
+              // while there is input from the client,
+              // look for the supported functions (search, lookup, buy)
+              // then make RPC call to the server
               try {
                 s = new Scanner(input);
                 func = s.next();
@@ -94,12 +130,16 @@ public class Client {
                 }else {
                   println("Invalid Input, can only support search, lookup, or buy");
                 }
+
               } catch (Exception e){
+                  // in case when the input is invalid
                   println("Invalid Input, can only support search, lookup, or buy");
                 continue;
               }
 		        }
+
       	}catch(Exception e){
+          // if the server failure occurs inform the client with some useful message
       		System.err.println( e.getClass().getName() + ": " + e.getMessage());
       	}
     }

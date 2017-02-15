@@ -2,7 +2,12 @@
 /**
 *  XML RPC Server in java
 *
-* (c) 2016 Diwas Timilsina
+*  Server supports following functionalities:
+*  1) update price of a book based on book's unique id
+*  2) restock book based on book's unique id
+*  3) log of purchases
+*
+* Author: 2016 Diwas Timilsina
 **/
 
 import java.util.*;
@@ -23,6 +28,7 @@ public class Server {
 
   private static final String SEARCH_QUERY = "SELECT * FROM books WHERE " + "topic = ? COLLATE NOCASE";
 
+  // string for the server response
   private static final String SERVER_RESPONSE = "\n++++++++++++++ Server Response+++++++++++++\n";
   private static final String SERVER_RESPONSE_END = "+++++++++++++++++++++++++++++++++++++++++++\n";
 
@@ -32,85 +38,142 @@ public class Server {
 
   private static String dbFilePath;
 
+  // log of all the purchases
   private static Queue<String> log = new ConcurrentLinkedQueue<String>();
 
 
-  // search operation by Client
+  /**
+  * Serch operation from the Client
+  *
+  * @param topic, topic is the category of book the client is interested in searching
+  * @return [Object], array of string containing descriptions of the book in that category
+  */
+
   public Object[] search(String topic){
+
     Connection database = openDataBase();
     Vector<String> returnData = new Vector<String>();
     returnData.addElement(SERVER_RESPONSE);
+
+    ResultSet search = null;
+    PreparedStatement stmt = null;
+
     try {
-      PreparedStatement stmt = database.prepareStatement(SEARCH_QUERY);
+
+      // create sql query statement and execute the query
+      stmt = database.prepareStatement(SEARCH_QUERY);
       stmt.setString(1, topic);
-      ResultSet search = stmt.executeQuery();
+      search = stmt.executeQuery();
+
+      // parse the resposne from the database
       while (search.next()){
         String result = "\n";
         result += "ID: " + search.getInt("ID")+"\n";
         result += "Title: "+ search.getString("TITLE")+"\n";
         returnData.addElement(result);
       }
-      stmt.close();
-      database.close();
+
     } catch(Exception e) {
+
       System.err.println( e.getClass().getName() + ": " + e.getMessage() );
       System.exit(0);
+
+    } finally {
+      // close database file before returning result regardless of the error or not
+
+  	  if (stmt != null){
+  	      try { stmt.close(); } catch (SQLException e) { System.err.println("Failed to close lookup statement"); }
+  	  }
+
+  	  if (database != null) {
+  	      try { database.close(); } catch (SQLException e) { System.err.println("Failed to close database in lookup statement"); }
+  	  }
+
+  	  if (search != null){
+  	      try { search.close(); } catch (SQLException e) { System.err.println("Failed to close lookup search statement"); }
+      }
     }
+
+    // incase no result was found
     if (returnData.size() == 1){
       returnData.addElement("Sorry, we couldn't Find the item you are looking for!\n");
     }
+
     returnData.addElement(SERVER_RESPONSE_END);
     return returnData.toArray();
   }
 
-  // lookup operation by Client
+
+  /**
+  * Lookup operation from the Client
+  *
+  * @param item_number, item_number is the unique identifier for each book
+  * @return [Object], array of string containing descriptions of the book in that category
+  */
+
   public Object lookup(int item_number){
+
     String result = SERVER_RESPONSE;
 
-      Connection database = openDataBase();
-      Statement stmt = null;
-      ResultSet search = null;
+    Connection database = openDataBase();
+    Statement stmt = null;
+    ResultSet search = null;
 
-      try {
-    	  stmt = database.createStatement();
-    	  search = stmt.executeQuery("SELECT * FROM BOOKS WHERE ID is " + item_number + ";");
+    try {
 
-    	  result += "ID: " + search.getInt("ID")+"\n";
-    	  result += "Title: "+ search.getString("TITLE")+"\n";
-    	  result += "Topic: "+ search.getString("TOPIC")+"\n";
-    	  result += "Price: "+ search.getFloat("PRICE")+"\n";
-    	  result += "In Stock: ";
-    	  result += (search.getInt("STOCK") > 0) ? "Yes\n" : "No\n";
+      // create sql query statement and execute the query
+  	  stmt = database.createStatement();
+  	  search = stmt.executeQuery("SELECT * FROM BOOKS WHERE ID is " + item_number + ";");
 
-      }catch(Exception e) {
-    	  System.err.println( e.getClass().getName() + ": " + e.getMessage());
-    	  result = SERVER_RESPONSE + "\nSorry, We Couldn't find the item that you are looking for!\n";
-      }finally {
+  	  result += "ID: " + search.getInt("ID")+"\n";
+  	  result += "Title: "+ search.getString("TITLE")+"\n";
+  	  result += "Topic: "+ search.getString("TOPIC")+"\n";
+  	  result += "Price: "+ search.getFloat("PRICE")+"\n";
+  	  result += "In Stock: ";
+  	  result += (search.getInt("STOCK") > 0) ? "Yes\n" : "No\n";
 
-    	  if (stmt != null){
-    	      try { stmt.close(); } catch (SQLException e) { System.err.println("Failed to close lookup statement"); }
-    	  }
+    }catch(Exception e) {
 
-    	  if (database != null) {
-    	      try { database.close(); } catch (SQLException e) { System.err.println("Failed to close database in lookup statement"); }
-    	  }
+  	  System.err.println( e.getClass().getName() + ": " + e.getMessage());
+  	  result = SERVER_RESPONSE + "\nSorry, We Couldn't find the item that you are looking for!\n";
 
-    	  if (search != null){
-    	      try { search.close(); } catch (SQLException e) { System.err.println("Failed to close lookup search statement"); }
-	      }
+    }finally {
+
+      // close database file before returning result regardless of the error or not
+
+  	  if (stmt != null){
+  	      try { stmt.close(); } catch (SQLException e) { System.err.println("Failed to close lookup statement"); }
+  	  }
+
+  	  if (database != null) {
+  	      try { database.close(); } catch (SQLException e) { System.err.println("Failed to close database in lookup statement"); }
+  	  }
+
+  	  if (search != null){
+  	      try { search.close(); } catch (SQLException e) { System.err.println("Failed to close lookup search statement"); }
       }
+    }
 
     result += SERVER_RESPONSE_END;
     return result;
   }
 
-  // buy the item associated with the item number
+  /**
+  * Purchase operation for the Client
+  *
+  * @param item_number, item_number is the unique identifier for each book
+  * @return [Object], array of string containing descriptions of the book in that category
+  */
+
   public Object buy(int item_number) {
-     String result = SERVER_RESPONSE;
-     Connection database = openDataBase();
-     Statement stmt = null;
+
+    String result = SERVER_RESPONSE;
+    Connection database = openDataBase();
+    Statement stmt = null;
 
   	try {
+
+        // create sql query statement and execute the query
   	    stmt = database.createStatement();
   	    int success = stmt.executeUpdate("UPDATE books SET stock = stock - 1  WHERE ID = " + item_number + " AND stock > 0;");
   	    database.commit();
@@ -121,16 +184,22 @@ public class Server {
   	    } else {
   		    result += "Failed to purchase item " + item_number + ". (Item out of stock)\n";
   	    }
-  	} catch (SQLException e) {
-  	    result += "Failed to purchase item " + item_number + ". (SQL failure)\n";
-  	} finally {
-  	    if (stmt != null){
-  		      try { stmt.close(); } catch (SQLException e) { }
-  	    }
 
-  	    if (database != null) {
-  		      try { database.close(); } catch (SQLException e) { }
-  	    }
+  	} catch (SQLException e) {
+
+  	    result += "Failed to purchase item " + item_number + ". (SQL failure)\n";
+
+  	} finally {
+
+        // close database file before returning result regardless of the error or not
+
+        if (stmt != null){
+            try { stmt.close(); } catch (SQLException e) { System.err.println("Failed to close lookup statement"); }
+        }
+
+        if (database != null) {
+            try { database.close(); } catch (SQLException e) { System.err.println("Failed to close database in lookup statement"); }
+        }
   	}
 
   	result += SERVER_RESPONSE_END;
@@ -151,11 +220,19 @@ public class Server {
       }
   }
 
-  //update the price
+  /**
+  * Update the price of a book based on the item_number
+  *
+  * @param item_number, item_number is the unique identifier for each book
+  * @param price, new price for the book
+  */
+
   private void update(int item_number, float price){
     Connection database = openDataBase();
     Statement stmt = null;
+
     try {
+
       stmt = database.createStatement();
       int num_changed = stmt.executeUpdate("UPDATE BOOKS set PRICE = "+ price +" where ID"+"="+item_number+";");
       database.commit();
@@ -166,17 +243,27 @@ public class Server {
 	       System.out.println("No records changed.");
 	       return;
       }
+
     } catch (SQLException e) {
 	     System.err.println("Failed to update price");
 	     return;
     }
+
     println("update Successfull");
   }
 
-  //restock the books
+  /**
+  * Restock a book based on the item_number
+  *
+  * @param item_number, item_number is the unique identifier for each book
+  * @param stockCount, new stock count of the book
+  */
+
   private void restock(int item_number, int stockCount){
+
     Connection database = openDataBase();
     Statement stmt = null;
+
     try {
       stmt = database.createStatement();
       int num_changed = stmt.executeUpdate("UPDATE BOOKS set STOCK = " + stockCount + " where ID = "+item_number+";");
@@ -188,24 +275,31 @@ public class Server {
 	       System.out.println("No records changed.");
 	       return;
       }
+
     } catch (SQLException e) {
 	     System.err.println("Couldn't restock");
 	     return;
     }
+
     println("restocking Successfull");
+
   }
 
   // print statement made easier
   public static void println(String print_text){
     System.out.println(print_text);
   }
+
   // print statement made easier
   public static void println(int print_int){
     System.out.println(print_int);
   }
 
-  // open the existing database or create a new database if
-  // needed
+  /*
+   * Helper function to open the existing database or create a new database if
+   * needed
+  */
+
   public Connection openDataBase(){
     Connection c = null;
     try {
@@ -219,13 +313,20 @@ public class Server {
   }
 
 
+  /*
+   * Main function for the Server
+  */
   public static void main(String[] args){
+
+      // read in the server port and the path to the database from standard in
+
       if (args.length < 2) {
 	       System.err.println("usage: java Server <port> <sqlite db file>");
 	       System.exit(1);
       }
 
       int port = -1;
+
       try {
 	       port = Integer.parseInt(args[0]);
       } catch (NumberFormatException e) {
@@ -235,9 +336,10 @@ public class Server {
 
       Server.dbFilePath = args[1];
 
-
     try {
+
       println("Appempting to Start the Server ...");
+
       PropertyHandlerMapping phm = new PropertyHandlerMapping();
       XmlRpcServer xmlRpcServer;
       WebServer server = new WebServer(port);
@@ -255,10 +357,17 @@ public class Server {
       String func;
 
       try{
+
+        // read input from the server standard input
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         String input;
 
+        // while there is input from the server,
+        // look for the supported functions (log, update, restock)
+        // and execute the function
+
         while((input=br.readLine())!=null){
+
           try {
             s = new Scanner(input);
             func = s.next();
@@ -271,6 +380,7 @@ public class Server {
             }else {
               println("Invalid Input, can only support log, update, or restock\n");
             }
+
           } catch (Exception e){
             println("Invalid Input, can only support log, update, or restock\n");
             continue;
@@ -283,5 +393,4 @@ public class Server {
       println("Server error: " + exception);
     }
   }
-
 }
